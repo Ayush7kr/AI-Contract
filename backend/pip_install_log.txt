@@ -1,0 +1,47 @@
+2026-03-19T19:01:37,846 Using pip 23.2.1 from F:\AiContract\backend\.venv\Lib\site-packages\pip (python 3.12)
+2026-03-19T19:01:37,847 Non-user install because user site-packages disabled
+2026-03-19T19:01:37,876 Created temporary directory: C:\Users\ayush\AppData\Local\Temp\pip-build-tracker-u1j6q7jo
+2026-03-19T19:01:37,878 Initialized build tracking at C:\Users\ayush\AppData\Local\Temp\pip-build-tracker-u1j6q7jo
+2026-03-19T19:01:37,878 Created build tracker: C:\Users\ayush\AppData\Local\Temp\pip-build-tracker-u1j6q7jo
+2026-03-19T19:01:37,880 Entered build tracker: C:\Users\ayush\AppData\Local\Temp\pip-build-tracker-u1j6q7jo
+2026-03-19T19:01:37,880 Created temporary directory: C:\Users\ayush\AppData\Local\Temp\pip-install-75s0katp
+2026-03-19T19:01:37,883 Created temporary directory: C:\Users\ayush\AppData\Local\Temp\pip-ephem-wheel-cache-yxuyfyyd
+2026-03-19T19:01:37,890 ERROR: Exception:
+2026-03-19T19:01:37,890 Traceback (most recent call last):
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\cli\base_command.py", line 180, in exc_logging_wrapper
+2026-03-19T19:01:37,890     status = run_func(*args)
+2026-03-19T19:01:37,890              ^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\cli\req_command.py", line 248, in wrapper
+2026-03-19T19:01:37,890     return func(self, options, args)
+2026-03-19T19:01:37,890            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\commands\install.py", line 362, in run
+2026-03-19T19:01:37,890     resolver = self.make_resolver(
+2026-03-19T19:01:37,890                ^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\cli\req_command.py", line 356, in make_resolver
+2026-03-19T19:01:37,890     import pip._internal.resolution.resolvelib.resolver
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\resolution\resolvelib\resolver.py", line 7, in <module>
+2026-03-19T19:01:37,890     from pip._vendor.resolvelib import BaseReporter, ResolutionImpossible
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_vendor\resolvelib\__init__.py", line 19, in <module>
+2026-03-19T19:01:37,890     from .resolvers import (
+2026-03-19T19:01:37,890   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_vendor\resolvelib\resolvers\__init__.py", line 1, in <module>
+2026-03-19T19:01:37,890     from ..structs import RequirementInformation
+2026-03-19T19:01:37,890 ImportError: cannot import name 'RequirementInformation' from 'pip._vendor.resolvelib.structs' (F:\AiContract\backend\.venv\Lib\site-packages\pip\_vendor\resolvelib\structs.py)
+2026-03-19T19:01:37,908 WARNING: There was an error checking the latest version of pip.
+2026-03-19T19:01:37,909 See below for error
+2026-03-19T19:01:37,909 Traceback (most recent call last):
+2026-03-19T19:01:37,909   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\self_outdated_check.py", line 230, in pip_self_version_check
+2026-03-19T19:01:37,909     upgrade_prompt = _self_version_check_logic(
+2026-03-19T19:01:37,909                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,909   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\self_outdated_check.py", line 191, in _self_version_check_logic
+2026-03-19T19:01:37,909     remote_version_str = state.get(current_time)
+2026-03-19T19:01:37,909                          ^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,909   File "F:\AiContract\backend\.venv\Lib\site-packages\pip\_internal\self_outdated_check.py", line 79, in get
+2026-03-19T19:01:37,909     last_check = datetime.datetime.strptime(self._state["last_check"], _DATE_FMT)
+2026-03-19T19:01:37,909                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,909   File "C:\Users\ayush\AppData\Local\Programs\Python\Python312\Lib\_strptime.py", line 555, in _strptime_datetime
+2026-03-19T19:01:37,909     tt, fraction, gmtoff_fraction = _strptime(data_string, format)
+2026-03-19T19:01:37,909                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-03-19T19:01:37,909   File "C:\Users\ayush\AppData\Local\Programs\Python\Python312\Lib\_strptime.py", line 333, in _strptime
+2026-03-19T19:01:37,909     raise ValueError("time data %r does not match format %r" %
+2026-03-19T19:01:37,909 ValueError: time data '2026-03-19T13:28:24.357981+00:00' does not match format '%Y-%m-%dT%H:%M:%SZ'
+2026-03-19T19:01:37,956 Removed build tracker: 'C:\\Users\\ayush\\AppData\\Local\\Temp\\pip-build-tracker-u1j6q7jo'
