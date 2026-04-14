@@ -9,7 +9,7 @@ import os
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routers import auth, contracts, analysis, ai, compliance, litigation, obligations, vendor, monitoring
+from app.routers import auth, contracts, analysis, ai, compliance, vendor
 
 # ─── Create all DB tables on startup ────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
@@ -43,10 +43,7 @@ app.include_router(contracts.router, prefix="/contracts", tags=["Contracts"])
 app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
 app.include_router(ai.router, prefix="/ai", tags=["AI Services"])
 app.include_router(compliance.router, prefix="/compliance", tags=["Compliance"])
-app.include_router(litigation.router, prefix="/litigation", tags=["Litigation"])
-app.include_router(obligations.router, prefix="/obligations", tags=["Obligations"])
 app.include_router(vendor.router, prefix="/vendor", tags=["Vendor Intelligence"])
-app.include_router(monitoring.router, prefix="/monitoring", tags=["Monitoring"])
 
 @app.get("/", tags=["Health"])
 def root():

@@ -1,17 +1,17 @@
 """
-AI Router: OpenAI-powered endpoints for rewrite suggestions, negotiation, and RAG chat.
+AI Router: Gemini-powered endpoints for clause rewriting, negotiation, contract chat, and legal news.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.contract import Contract
 from app.schemas.contract import SuggestRequest, NegotiateRequest, ChatRequest
-from app.services.gemini_service import suggest_rewrite, generate_negotiation, answer_legal_question
-from app.services.rag_service import index_contract, retrieve_relevant
+from app.services.gemini_service import rewrite_clause, chat_with_document, generate_legal_news, generate_contract_news
+from app.services.rag_service import retrieve_relevant
 
 router = APIRouter()
 
@@ -25,12 +25,11 @@ def suggest(
     if not request.clause_text or len(request.clause_text.strip()) < 10:
         raise HTTPException(status_code=400, detail="Clause text is too short")
 
-    result = suggest_rewrite(
+    result = rewrite_clause(
         clause_text=request.clause_text,
-        clause_type=request.clause_type or "general",
-        risk_reason=request.risk_reason or "",
+        tone=request.clause_type or "collaborative",
     )
-    return result
+    return {"original": request.clause_text, **result}
 
 
 @router.post("/negotiate")
@@ -38,15 +37,15 @@ def negotiate(
     request: NegotiateRequest,
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Generate a professional negotiation response for a clause."""
+    """Rewrite a clause in the specified tone while preserving legal meaning."""
     if not request.clause_text or len(request.clause_text.strip()) < 10:
         raise HTTPException(status_code=400, detail="Clause text is too short")
 
-    result = generate_negotiation(
+    result = rewrite_clause(
         clause_text=request.clause_text,
-        context=request.context or "",
+        tone=request.tone,
     )
-    return result
+    return {"original": request.clause_text, **result}
 
 
 @router.post("/chat")
@@ -56,7 +55,7 @@ def chat(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Answer legal questions using RAG over uploaded contracts.
+    Answer legal questions using the contract document as context.
     If contract_id is provided, retrieves relevant context from that contract.
     """
     if not request.question or len(request.question.strip()) < 3:
@@ -73,13 +72,11 @@ def chat(
 
         if contract and contract.raw_text:
             source_contract = contract.filename
-            # Index if not already done
-            index_contract(contract.id, contract.raw_text)
-            # Retrieve relevant chunks
-            chunks = retrieve_relevant(contract.id, request.question, top_k=3)
-            context = "\n\n---\n\n".join(chunks)
+            # Get relevant chunks for context
+            chunks = retrieve_relevant(contract.raw_text, request.question, top_k=3)
+            context = "\n\n---\n\n".join(chunks) if chunks else contract.raw_text[:8000]
 
-    answer = answer_legal_question(request.question, context)
+    answer = chat_with_document(request.question, context)
 
     return {
         "question": request.question,
@@ -87,3 +84,44 @@ def chat(
         "source_contract": source_contract,
         "context_used": bool(context),
     }
+
+
+# ─── Legal News & Regulatory Intelligence ────────────────────────────────────
+
+@router.get("/legal-news")
+def get_legal_news(
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Generate AI-curated legal and regulatory news updates."""
+    result = generate_legal_news()
+    return result
+
+
+@router.get("/legal-news/{contract_id}")
+def get_contract_news(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Generate regulatory impact analysis specific to a contract."""
+    contract = db.query(Contract).filter(
+        Contract.id == contract_id,
+        Contract.user_id == current_user.id,
+    ).first()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    if not contract.raw_text:
+        raise HTTPException(status_code=400, detail="No text available for analysis")
+
+    # Get both general news and contract-specific insights
+    general = generate_legal_news()
+    specific = generate_contract_news(contract.raw_text)
+
+    return {
+        "contract_id": contract_id,
+        "filename": contract.filename,
+        "news": general.get("news", []),
+        "contract_insights": specific.get("contract_insights", []),
+    }
+

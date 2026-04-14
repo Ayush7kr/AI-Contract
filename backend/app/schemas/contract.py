@@ -14,6 +14,8 @@ class ContractResponse(BaseModel):
     word_count: int
     risk_score: Optional[float]
     risk_level: Optional[str]
+    is_valid_contract: bool = True
+    ai_summary: Optional[str] = None
     status: str
     created_at: datetime
     analysis_json: Optional[Any]
@@ -26,17 +28,6 @@ class ContractDetailResponse(ContractResponse):
     raw_text: Optional[str]
     clauses_json: Optional[Any]
     compliance_json: Optional[Any]
-    litigation_json: Optional[Any]
-    obligations_json: Optional[Any]
-
-
-class AnalyzeRequest(BaseModel):
-    contract_id: int
-
-
-class CompareRequest(BaseModel):
-    contract_id_1: int
-    contract_id_2: int
 
 
 class SuggestRequest(BaseModel):
@@ -47,7 +38,7 @@ class SuggestRequest(BaseModel):
 
 class NegotiateRequest(BaseModel):
     clause_text: str
-    context: Optional[str] = None
+    tone: str = "collaborative"
 
 
 class ChatRequest(BaseModel):

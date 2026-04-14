@@ -1,13 +1,12 @@
 """
 Contracts Router: Upload, list, get, delete contracts.
-Handles file upload, text extraction, and basic storage.
+Handles file upload, text extraction, validation, and Gemini analysis.
 """
 import os
-import shutil
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,10 +15,8 @@ from app.core.config import settings
 from app.models.user import User
 from app.models.contract import Contract
 from app.schemas.contract import ContractResponse, ContractDetailResponse
-from app.services.extraction import extract_text
-from app.services.nlp import analyze_clauses
-from app.services.gemini_service import summarize_contract
-from app.services.risk_engine import calculate_risk_score, get_risk_level, get_risk_summary
+from app.services.extraction import extract_text, validate_contract
+from app.services.gemini_service import analyze_contract
 
 router = APIRouter()
 
@@ -28,12 +25,11 @@ ALLOWED_TYPES = {"pdf", "docx", "doc", "txt"}
 
 @router.post("/upload", response_model=ContractDetailResponse)
 async def upload_contract(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upload a contract file (PDF/DOCX/TXT), extract text, and run analysis."""
+    """Upload a contract file (PDF/DOCX/TXT), extract text, validate, and run AI analysis."""
     # Validate file type
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
     if ext not in ALLOWED_TYPES:
@@ -71,30 +67,36 @@ async def upload_contract(
     db.commit()
     db.refresh(contract)
 
-    # Extract text and analyze
+    # Extract text
     try:
         raw_text, page_count = extract_text(file_path, ext)
         word_count = len(raw_text.split()) if raw_text else 0
 
-        # Run NLP analysis
-        clauses = analyze_clauses(raw_text) if raw_text else []
-        summary = get_risk_summary(clauses)
-        
-        # Add AI Summary using Gemini
-        ai_summary = summarize_contract(raw_text, summary["risk_score"])
-        summary["ai_summary"] = ai_summary
-
-        risk_score = summary["risk_score"]
-        risk_level = summary["risk_level"]
-
-        # Update contract record
         contract.raw_text = raw_text
         contract.page_count = page_count
         contract.word_count = word_count
-        contract.clauses_json = clauses
-        contract.analysis_json = summary
-        contract.risk_score = risk_score
-        contract.risk_level = risk_level
+
+        # Validate if this is a real contract
+        is_valid = validate_contract(raw_text)
+        contract.is_valid_contract = is_valid
+
+        if not is_valid:
+            contract.status = "not_contract"
+            contract.ai_summary = "This document does not appear to be a valid legal contract for analysis."
+            contract.risk_score = None
+            contract.risk_level = None
+            db.commit()
+            db.refresh(contract)
+            return ContractDetailResponse.model_validate(contract)
+
+        # Run Gemini AI analysis
+        analysis = analyze_contract(raw_text)
+
+        contract.risk_score = analysis["risk_score"]
+        contract.risk_level = analysis["risk_level"]
+        contract.ai_summary = analysis["summary"]
+        contract.clauses_json = analysis.get("key_clauses", [])
+        contract.analysis_json = analysis
         contract.status = "done"
         db.commit()
         db.refresh(contract)

@@ -1,0 +1,76 @@
+PROFESSIONAL SERVICES AGREEMENT
+
+This Professional Services Agreement ("Agreement") is entered into as of January 15, 2025, by and between:
+
+Party A: TechCorp Solutions Inc., a Delaware corporation ("Client")
+Party B: DataFlow Analytics LLC, a California limited liability company ("Contractor")
+
+WHEREAS, Client desires to engage Contractor to provide certain professional services, and Contractor desires to perform such services, the parties agree as follows:
+
+ARTICLE 1: SCOPE OF SERVICES
+1.1 Contractor shall provide data analytics, machine learning model development, and consulting services as described in Exhibit A attached hereto.
+1.2 All deliverables shall be completed within the timeline specified in the project plan.
+
+ARTICLE 2: COMPENSATION AND PAYMENT
+2.1 Client shall pay Contractor a total fee of $250,000 for the services described herein.
+2.2 Payment shall be made in monthly installments of $41,666.67, due within 30 days of receipt of invoice.
+2.3 Late payments shall accrue interest at a rate of 1.5% per month.
+2.4 Penalties for early termination shall be $75,000 plus any outstanding invoices.
+
+ARTICLE 3: TERM AND TERMINATION
+3.1 This Agreement shall commence on the Effective Date and continue for a period of six (6) months.
+3.2 Either party may terminate this Agreement with 30 days written notice.
+3.3 This Agreement shall auto-renew for successive one-year terms unless either party provides 60 days written notice of non-renewal.
+3.4 Upon termination, Client shall pay for all services rendered through the date of termination.
+
+ARTICLE 4: INTELLECTUAL PROPERTY
+4.1 All work product created by Contractor shall be considered "work made for hire" and shall be the sole property of Client.
+4.2 Client grants Contractor a perpetual license to use general methodologies and techniques developed during the engagement.
+4.3 Contractor retains all rights to pre-existing intellectual property.
+
+ARTICLE 5: CONFIDENTIALITY
+5.1 Each party agrees to maintain the confidentiality of all proprietary information disclosed by the other party.
+5.2 Confidentiality obligations shall survive termination of this Agreement in perpetuity.
+5.3 Neither party shall disclose confidential information to any third party without prior written consent.
+
+ARTICLE 6: LIABILITY AND INDEMNIFICATION
+6.1 Contractor shall have unlimited liability for damages arising from breach of this Agreement.
+6.2 Client shall indemnify and hold harmless Contractor against any and all claims arising from Client's use of the deliverables.
+6.3 Contractor shall indemnify Client against third party intellectual property infringement claims.
+6.4 IN NO EVENT SHALL EITHER PARTY BE LIABLE FOR INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES.
+
+ARTICLE 7: WARRANTIES AND REPRESENTATIONS
+7.1 Contractor warrants that all services shall be performed in a professional and workmanlike manner.
+7.2 Contractor represents that it has the expertise and resources necessary to perform the services.
+7.3 THE SERVICES ARE PROVIDED "AS-IS" WITH NO WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+
+ARTICLE 8: DISPUTE RESOLUTION
+8.1 Any dispute arising under this Agreement shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association.
+8.2 The arbitration shall take place in San Francisco, California.
+8.3 The prevailing party shall be entitled to recover reasonable attorneys' fees.
+
+ARTICLE 9: NON-COMPETE
+9.1 During the term of this Agreement and for a period of two (2) years following termination, Contractor agrees not to provide similar services to Client's direct competitors.
+
+ARTICLE 10: GOVERNING LAW
+10.1 This Agreement shall be governed by and construed in accordance with the laws of the State of California.
+10.2 The parties consent to the exclusive jurisdiction of the courts of California.
+
+ARTICLE 11: GENERAL PROVISIONS
+11.1 This Agreement constitutes the entire agreement between the parties and supersedes all prior agreements.
+11.2 Any modification to this Agreement must be in writing and signed by both parties.
+11.3 If any provision of this Agreement is found to be unenforceable, the remaining provisions shall continue in full force and effect.
+11.4 Waiver of any breach shall not constitute waiver of any subsequent breach.
+11.5 The rights and obligations under this Agreement may be assigned only with prior written consent.
+
+IN WITNESS WHEREOF, the parties have executed this Agreement as of the date first written above.
+
+CLIENT: TechCorp Solutions Inc.
+By: ___________________________
+Name: John Smith
+Title: Chief Executive Officer
+
+CONTRACTOR: DataFlow Analytics LLC
+By: ___________________________
+Name: Sarah Johnson
+Title: Managing Partner

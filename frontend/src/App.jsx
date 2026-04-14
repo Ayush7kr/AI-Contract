@@ -13,22 +13,15 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
-// Main pages
+// Main pages (7 core)
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Contracts from './pages/Contracts';
-import Analysis from './pages/Analysis';
+import ContractAnalysis from './pages/ContractAnalysis';
+import LegalChat from './pages/LegalChat';
 import Negotiate from './pages/Negotiate';
 import Compliance from './pages/Compliance';
-import Litigation from './pages/Litigation';
-import Obligations from './pages/Obligations';
-import Compare from './pages/Compare';
 import VendorIntel from './pages/VendorIntel';
-import Monitoring from './pages/Monitoring';
-import LegalChat from './pages/LegalChat';
-import Jurisdiction from './pages/Jurisdiction';
-import Generate from './pages/Generate';
-import RegMonitor from './pages/RegMonitor';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -61,18 +54,11 @@ function AppRoutes() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="upload" element={<Upload />} />
         <Route path="contracts" element={<Contracts />} />
-        <Route path="analysis/:id" element={<Analysis />} />
+        <Route path="contracts/:id" element={<ContractAnalysis />} />
+        <Route path="chat" element={<LegalChat />} />
         <Route path="negotiate" element={<Negotiate />} />
         <Route path="compliance" element={<Compliance />} />
-        <Route path="litigation" element={<Litigation />} />
-        <Route path="obligations" element={<Obligations />} />
-        <Route path="compare" element={<Compare />} />
         <Route path="vendor" element={<VendorIntel />} />
-        <Route path="monitoring" element={<Monitoring />} />
-        <Route path="jurisdiction" element={<Jurisdiction />} />
-        <Route path="generate" element={<Generate />} />
-        <Route path="regulation" element={<RegMonitor />} />
-        <Route path="chat" element={<LegalChat />} />
       </Route>
 
       {/* Fallback */}

@@ -1,29 +1,34 @@
 """
 Text extraction service.
-Handles PDF (pdfplumber), DOCX (python-docx), and scanned PDFs (OCR via pytesseract).
+Handles PDF (PyPDF2), DOCX (python-docx), and TXT files.
+Includes contract validation.
 """
-import os
-import io
+import re
 from typing import Tuple
-try:
-    import pdfplumber
-except ImportError:
-    pdfplumber = None
 
 try:
-    import pytesseract
+    from PyPDF2 import PdfReader
 except ImportError:
-    pytesseract = None
-
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
+    PdfReader = None
 
 try:
     from docx import Document
 except ImportError:
     Document = None
+
+
+# Keywords that indicate a legal contract
+CONTRACT_KEYWORDS = [
+    "agreement", "party", "parties", "terms", "conditions",
+    "liability", "indemnity", "termination", "confidential",
+    "obligations", "shall", "hereby", "whereas", "covenant",
+    "warrant", "represent", "governing law", "jurisdiction",
+    "breach", "remedy", "clause", "section", "article",
+    "execute", "binding", "contract", "license", "lessee",
+    "lessor", "tenant", "landlord", "employer", "employee",
+]
+
+MIN_KEYWORD_MATCHES = 3  # Require at least 3 distinct keyword hits
 
 
 def extract_text(file_path: str, file_type: str) -> Tuple[str, int]:
@@ -34,12 +39,12 @@ def extract_text(file_path: str, file_type: str) -> Tuple[str, int]:
     file_type = file_type.lower().strip(".")
 
     if file_type == "pdf":
-        if not pdfplumber:
-             raise RuntimeError("PDF extraction module (pdfplumber) is not installed on the server.")
+        if not PdfReader:
+            raise RuntimeError("PDF extraction module (PyPDF2) is not installed on the server.")
         return _extract_pdf(file_path)
     elif file_type in ("docx", "doc"):
         if not Document:
-             raise RuntimeError("DOCX extraction module (python-docx) is not installed on the server.")
+            raise RuntimeError("DOCX extraction module (python-docx) is not installed on the server.")
         return _extract_docx(file_path)
     elif file_type == "txt":
         return _extract_txt(file_path)
@@ -47,38 +52,32 @@ def extract_text(file_path: str, file_type: str) -> Tuple[str, int]:
         raise ValueError(f"Unsupported file type: {file_type}")
 
 
-def _extract_pdf(file_path: str) -> Tuple[str, int]:
-    """Extract text from PDF using pdfplumber; fallback to OCR for scanned pages."""
-    extracted_pages = []
-    page_count = 0
+def validate_contract(text: str) -> bool:
+    """
+    Check if the extracted text looks like a legal contract.
+    Returns True if it contains enough legal keywords.
+    """
+    if not text or len(text.strip()) < 100:
+        return False
 
+    text_lower = text.lower()
+    matches = sum(1 for kw in CONTRACT_KEYWORDS if kw in text_lower)
+    return matches >= MIN_KEYWORD_MATCHES
+
+
+def _extract_pdf(file_path: str) -> Tuple[str, int]:
+    """Extract text from PDF using PyPDF2."""
     try:
-        with pdfplumber.open(file_path) as pdf:
-            page_count = len(pdf.pages)
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text and text.strip():
-                    extracted_pages.append(text)
-                else:
-                    # Fallback: OCR on the page image
-                    ocr_text = _ocr_page(page)
-                    if ocr_text:
-                        extracted_pages.append(ocr_text)
+        reader = PdfReader(file_path)
+        page_count = len(reader.pages)
+        extracted_pages = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text and text.strip():
+                extracted_pages.append(text)
+        return "\n\n".join(extracted_pages), page_count
     except Exception as e:
         raise RuntimeError(f"PDF extraction failed: {str(e)}")
-
-    return "\n\n".join(extracted_pages), page_count
-
-
-def _ocr_page(page) -> str:
-    """Run OCR on a pdfplumber page object."""
-    try:
-        img = page.to_image(resolution=200).original
-        if not pytesseract:
-            return ""
-        return pytesseract.image_to_string(img)
-    except Exception:
-        return ""
 
 
 def _extract_docx(file_path: str) -> Tuple[str, int]:

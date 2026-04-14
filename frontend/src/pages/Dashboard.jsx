@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { contractsAPI, monitoringAPI } from '../api/client';
+import { contractsAPI, aiAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { 
-  RadialBarChart, RadialBar, ResponsiveContainer, ScatterChart, Scatter, 
-  XAxis, YAxis, ZAxis, Tooltip, Cell
+  RadialBarChart, RadialBar, ResponsiveContainer
 } from 'recharts';
 import { 
-  LayoutDashboard, Upload, Zap, Bell, Gavel, Calendar, Building2, GitCompare, MessageSquare, Shield, X
+  Upload, FileText, Shield, AlertTriangle, 
+  MessageSquare, Building2, Gavel, ChevronRight,
+  Globe, Zap, ArrowUpRight
 } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 const RISK_COLORS = { critical: '#dc2626', high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
 
@@ -17,40 +17,38 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
-  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [legalNews, setLegalNews] = useState([]);
+  const [loadingNews, setLoadingNews] = useState(false);
 
   useEffect(() => {
-    Promise.all([contractsAPI.list(), monitoringAPI.getAlerts()])
-      .then(([cRes, aRes]) => {
-        setContracts(cRes.data);
-        setAlerts(aRes.data.alerts || []);
-      })
-      .catch(() => toast.error('Failed to load command center data'))
+    contractsAPI.list()
+      .then(r => setContracts(r.data))
+      .catch(() => {})
       .finally(() => setLoading(false));
+
+    setLoadingNews(true);
+    aiAPI.legalNews()
+      .then(r => setLegalNews(r.data.news || []))
+      .catch(() => {})
+      .finally(() => setLoadingNews(false));
   }, []);
 
-  const avgRisk = contracts.length
-    ? Math.round(contracts.filter(c => c.risk_score).reduce((s, c) => s + c.risk_score, 0) / contracts.filter(c => c.risk_score).length) || 0
+  const validContracts = contracts.filter(c => c.is_valid_contract && c.risk_score !== null);
+
+  const avgRisk = validContracts.length
+    ? Math.round(validContracts.reduce((s, c) => s + c.risk_score, 0) / validContracts.length)
     : 0;
 
-  const gaugeData = [{ name: 'Risk', value: avgRisk, fill: 'var(--accent)' }];
+  const gaugeData = [{ name: 'Risk', value: avgRisk, fill: avgRisk >= 75 ? '#ef4444' : avgRisk >= 50 ? '#f59e0b' : avgRisk >= 25 ? '#fbbf24' : '#10b981' }];
 
-  const scatterData = contracts.map((c, i) => ({
-    x: (i * 15) % 100,
-    y: c.risk_score || 0,
-    z: 200,
-    name: c.filename,
-    level: c.risk_level
-  }));
-
-  const timelineData = [
-    { name: 'Month 1', risk: 30, type: 'Renewal' },
-    { name: 'Month 3', risk: 70, type: 'Deadline' },
-    { name: 'Month 6', risk: 45, type: 'Renewal' },
-    { name: 'Month 9', risk: 90, type: 'Termination' },
-    { name: 'Month 12', risk: 55, type: 'Renewal' },
-  ];
+  // Extract all key risks from analyzed contracts
+  const allRisks = validContracts.flatMap(c => 
+    (c.analysis_json?.key_risks || []).map(r => ({
+      ...r,
+      contract: c.filename
+    }))
+  ).slice(0, 6);
 
   if (loading) return (
     <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
@@ -59,159 +57,161 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="page-container" style={{ maxWidth: '100%', padding: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>
-        <div className="notif-dot" /> Evaluated 1,240 renewal windows across all contracts...
+    <div className="page-container" style={{ maxWidth: '100%', padding: '32px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>
+          Welcome back{user?.full_name ? `, ${user.full_name.split(' ')[0]}` : ''}
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+          {validContracts.length > 0 
+            ? `Analyzing ${validContracts.length} contract${validContracts.length > 1 ? 's' : ''} in your portfolio`
+            : 'Upload your first contract to get started with AI analysis'
+          }
+        </p>
       </div>
 
-      <div className="grid-dashboard" style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-        gap: 24, 
-        marginBottom: 24 
-      }}>
-        <div className="card glass" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 440 }}>
-          <div style={{ position: 'relative', height: 280, marginTop: -40 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={12} data={gaugeData} startAngle={225} endAngle={-45}>
-                <RadialBar background clockWise dataKey="value" cornerRadius={10} />
-              </RadialBarChart>
-            </ResponsiveContainer>
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -40%)' }}>
-              <div style={{ fontSize: 64, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{avgRisk}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 8 }}>Risk Index</div>
-            </div>
+      {contracts.length === 0 ? (
+        /* Empty state */
+        <div className="card glass" style={{ textAlign: 'center', padding: '80px 40px' }}>
+          <div style={{ width: 80, height: 80, borderRadius: 24, background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', border: '1px solid var(--accent)' }}>
+            <Upload size={32} color="var(--accent)" />
           </div>
-          <div style={{ padding: '0 24px' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>Real-time legal exposure level</div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <div style={{ flex: 1, padding: '12px', background: 'rgba(16,185,129,0.1)', borderRadius: 12 }}>
-                <div style={{ color: 'var(--success)', fontWeight: 700, fontSize: 16 }}>{contracts.filter(c => c.risk_level === 'low').length}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Safe</div>
-              </div>
-              <div style={{ flex: 1, padding: '12px', background: 'rgba(245,158,11,0.1)', borderRadius: 12 }}>
-                <div style={{ color: 'var(--warning)', fontWeight: 700, fontSize: 16 }}>{contracts.filter(c => c.risk_level === 'medium').length}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Caution</div>
-              </div>
-              <div style={{ flex: 1, padding: '12px', background: 'rgba(239,68,68,0.1)', borderRadius: 12 }}>
-                <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 16 }}>{contracts.filter(c => c.risk_level === 'critical').length}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Risk</div>
-              </div>
-            </div>
-          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>No Contracts Yet</h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto 32px', lineHeight: 1.6 }}>
+            Upload a legal contract (PDF, DOCX, or TXT) to unlock AI-powered risk analysis, compliance scanning, and intelligent clause negotiation.
+          </p>
+          <button className="btn btn-primary btn-lg" onClick={() => navigate('/upload')} style={{ margin: '0 auto' }}>
+            <Upload size={18} /> Upload Your First Contract
+          </button>
         </div>
-
-        <div className="card glass" style={{ height: 440 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Contract Field Analysis</h3>
-            <div style={{ display: 'flex', gap: 16, fontSize: 11, fontWeight: 600 }}>
-              <span style={{ color: 'var(--success)' }}>● Optimized</span>
-              <span style={{ color: 'var(--warning)' }}>● Moderate</span>
-              <span style={{ color: 'var(--danger)' }}>● Exposure</span>
-            </div>
-          </div>
-          <div style={{ height: 340 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <XAxis type="number" dataKey="x" hide domain={[0, 100]} />
-                <YAxis type="number" dataKey="y" hide domain={[0, 100]} />
-                <ZAxis type="number" dataKey="z" range={[60, 400]} />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }} 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="card-sm" style={{ border: '1px solid var(--border-accent)', background: 'var(--bg-card)', padding: '12px' }}>
-                          <p style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>{data.name}</p>
-                          <p style={{ fontSize: 11, color: RISK_COLORS[data.level] }}>Risk Score: {data.y}/100</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Scatter data={scatterData} shape="circle">
-                  {scatterData.map((entry, index) => (
-                    <Cell key={index} fill={RISK_COLORS[entry.level]} style={{ filter: `drop-shadow(0 0 8px ${RISK_COLORS[entry.level]}40)` }} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="card glass" style={{ padding: 0, height: 440, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '24px', borderBottom: '1px solid var(--border)' }}>
-             <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Monitoring Feed</h3>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-            {alerts.length > 0 ? alerts.map((alert, i) => (
-              <div key={i} className="card-sm" style={{ 
-                marginBottom: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
-                padding: '16px', position: 'relative', overflow: 'hidden'
-              }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: RISK_COLORS[alert.severity] || 'var(--accent)' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: RISK_COLORS[alert.severity] || 'var(--text-primary)' }}>{alert.title}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>few min ago</span>
+      ) : (
+        <>
+          {/* Stats Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginBottom: 32 }}>
+            {/* Risk Gauge */}
+            <div className="card glass" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 360 }}>
+              <div style={{ position: 'relative', height: 220, marginTop: -20 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={12} data={gaugeData} startAngle={225} endAngle={-45}>
+                    <RadialBar background clockWise dataKey="value" cornerRadius={10} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -40%)' }}>
+                  <div style={{ fontSize: 56, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{avgRisk}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 8 }}>Risk Index</div>
                 </div>
-                <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{alert.message}</p>
               </div>
-            )) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
-                No active threats detected.
+              <div style={{ padding: '0 24px' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>Average risk across {validContracts.length} analyzed contract{validContracts.length !== 1 ? 's' : ''}</div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, padding: '10px', background: 'rgba(16,185,129,0.1)', borderRadius: 12 }}>
+                    <div style={{ color: 'var(--success)', fontWeight: 700, fontSize: 18 }}>{validContracts.filter(c => c.risk_level === 'low').length}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Low Risk</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px', background: 'rgba(245,158,11,0.1)', borderRadius: 12 }}>
+                    <div style={{ color: 'var(--warning)', fontWeight: 700, fontSize: 18 }}>{validContracts.filter(c => c.risk_level === 'medium' || c.risk_level === 'high').length}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Medium+</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '10px', background: 'rgba(239,68,68,0.1)', borderRadius: 12 }}>
+                    <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 18 }}>{validContracts.filter(c => c.risk_level === 'critical').length}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Critical</div>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
 
-      <div className="card glass" style={{ height: 180 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, padding: '0 8px' }}>
-          <h3 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Risk Timeline — Next 12 Months</h3>
-          <div style={{ display: 'flex', gap: 16, fontSize: 10, color: 'var(--text-muted)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 6, height: 6, background: '#f59e0b', borderRadius: '50%' }} /> Renewal</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }} /> Deadline</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 6, height: 6, background: '#3b82f6', borderRadius: '50%' }} /> Termination</span>
-          </div>
-        </div>
-        
-        <div style={{ position: 'relative', height: 40, borderBottom: '1px solid var(--border)', margin: '0 20px' }}>
-          {timelineData.map((d, i) => (
-            <div 
-              key={i} 
-              style={{ 
-                position: 'absolute', 
-                left: `${(i * 20) + 10}%`, 
-                bottom: -4, 
-                width: 8, height: 8, 
-                borderRadius: '50%',
-                background: d.type === 'Renewal' ? '#f59e0b' : d.type === 'Deadline' ? '#ef4444' : '#3b82f6',
-                boxShadow: `0 0 12px ${d.type === 'Renewal' ? '#f59e0b' : d.type === 'Deadline' ? '#ef4444' : '#3b82f6'}`
-              }}
-            />
-          ))}
-          <div style={{ position: 'absolute', bottom: -20, left: 0, fontSize: 10, color: 'var(--text-muted)' }}>Today</div>
-          <div style={{ position: 'absolute', bottom: -20, left: '25%', fontSize: 10, color: 'var(--text-muted)' }}>90d</div>
-          <div style={{ position: 'absolute', bottom: -20, left: '50%', fontSize: 10, color: 'var(--text-muted)' }}>180d</div>
-          <div style={{ position: 'absolute', bottom: -20, left: '75%', fontSize: 10, color: 'var(--text-muted)' }}>270d</div>
-          <div style={{ position: 'absolute', bottom: -20, right: 0, fontSize: 10, color: 'var(--text-muted)' }}>1 Year</div>
-        </div>
-      </div>
+            {/* AI Summary */}
+            <div className="card glass" style={{ display: 'flex', flexDirection: 'column', minHeight: 360 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 20 }}>AI-Generated Insights</h3>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {validContracts.length > 0 ? validContracts.slice(0, 3).map(c => (
+                  <div key={c.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{c.filename}</span>
+                      <span className={`badge badge-${c.risk_level || 'low'}`} style={{ fontSize: 10 }}>{c.risk_level}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                      {c.ai_summary || c.analysis_json?.summary || 'Analysis pending...'}
+                    </p>
+                  </div>
+                )) : (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+                    No analyzed contracts yet.
+                  </div>
+                )}
+              </div>
+            </div>
 
-      <div style={{
-        position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20,
-        padding: '12px 24px', display: 'flex', gap: 24, boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-        zIndex: 100
-      }}>
-        <button onClick={() => navigate('/upload')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', transition: 'transform 0.2s' }}><Upload size={20} /></button>
-        <button onClick={() => navigate('/contracts')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', transition: 'transform 0.2s' }}><LayoutDashboard size={20} /></button>
-        <button onClick={() => navigate('/chat')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', transition: 'transform 0.2s' }}><Zap size={20} /></button>
-        <button onClick={() => navigate('/monitoring')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', transition: 'transform 0.2s' }}><Bell size={20} /></button>
-      </div>
+            {/* Regulatory Intelligence */}
+            <div className="card glass" style={{ display: 'flex', flexDirection: 'column', minHeight: 360 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Regulatory Intelligence</h3>
+                <span className="badge badge-info" style={{ fontSize: 9 }}>Live AI Feed</span>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {loadingNews ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                    <div className="spinner" style={{ width: 24, height: 24, margin: '0 auto 12px' }} />
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Fetching latest legal updates...</p>
+                  </div>
+                ) : legalNews.length > 0 ? legalNews.map((news, i) => (
+                  <div key={i} style={{ marginBottom: 16, padding: '14px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', transition: 'transform 0.2s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.4, flex: 1, paddingRight: 8 }}>{news.title}</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: news.impact_level === 'High' ? 'var(--danger)' : 'var(--info)', textTransform: 'uppercase' }}>{news.impact_level}</span>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 8 }}>{news.summary}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600 }}>#{news.category}</span>
+                      <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                         {news.call_to_action} <ArrowUpRight size={10} />
+                      </button>
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+                    No news updates available at the moment.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="card glass" style={{ padding: '20px 24px' }}>
+            <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>Quick Actions</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              {[
+                { label: 'Upload Contract', icon: Upload, path: '/upload', color: 'var(--accent)' },
+                { label: 'AI Assistant', icon: MessageSquare, path: '/chat', color: '#10b981' },
+                { label: 'Negotiate Clause', icon: Gavel, path: '/negotiate', color: '#f59e0b' },
+                { label: 'Compliance Scan', icon: Shield, path: '/compliance', color: '#3b82f6' },
+                { label: 'Vendor Intel', icon: Building2, path: '/vendor', color: '#8b5cf6' },
+                { label: 'View Contracts', icon: FileText, path: '/contracts', color: '#ec4899' },
+              ].map(action => (
+                <button
+                  key={action.path}
+                  onClick={() => navigate(action.path)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '14px 16px', borderRadius: 12,
+                    background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+                    cursor: 'pointer', color: 'var(--text-primary)',
+                    transition: 'all 0.2s', fontSize: 13, fontWeight: 600,
+                  }}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: `${action.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <action.icon size={16} style={{ color: action.color }} />
+                  </div>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{action.label}</span>
+                  <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

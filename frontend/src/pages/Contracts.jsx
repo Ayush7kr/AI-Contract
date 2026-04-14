@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contractsAPI } from '../api/client';
 import { 
-  FileText, Trash2, Eye, Search, Upload, 
-  Calendar, Layers, Activity
+  FileText, Trash2, Search, Upload, 
+  Calendar, Layers, Activity, AlertTriangle, ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,7 @@ export default function Contracts() {
     setLoading(true);
     contractsAPI.list()
       .then(r => setContracts(r.data))
-      .catch(() => toast.error('Failed to load repository'))
+      .catch(() => toast.error('Failed to load contracts'))
       .finally(() => setLoading(false));
   };
 
@@ -33,9 +33,9 @@ export default function Contracts() {
     try {
       await contractsAPI.delete(id);
       setContracts(c => c.filter(x => x.id !== id));
-      toast.success('Document purged');
+      toast.success('Contract deleted');
     } catch {
-      toast.error('Purge failed');
+      toast.error('Delete failed');
     } finally { setDeleting(null); }
   };
 
@@ -48,11 +48,11 @@ export default function Contracts() {
     <div className="page-container" style={{ maxWidth: 1200, padding: '32px 60px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 }}>
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 800 }}>Document Intelligence</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>Manage and analyze your enterprise contract repository</p>
+          <h1 style={{ fontSize: 32, fontWeight: 800 }}>My Contracts</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>Manage and review your uploaded contracts</p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/upload')}>
-          <Upload size={16} /> New Document
+          <Upload size={16} /> Upload New
         </button>
       </div>
 
@@ -62,7 +62,7 @@ export default function Contracts() {
           <input
             className="input"
             style={{ paddingLeft: 44, background: 'rgba(255,255,255,0.02)', borderColor: 'transparent' }}
-            placeholder="Search documents by name or metadata..."
+            placeholder="Search by filename..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -91,57 +91,81 @@ export default function Contracts() {
           <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
              <FileText size={40} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
           </div>
-          <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Empty Repository</h3>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto 32px' }}>Your contract intelligence workspace is currently empty. Upload documents to start analysis.</p>
+          <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>No Contracts Found</h3>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto 32px' }}>Upload your first contract to get started with AI analysis.</p>
           <button className="btn btn-primary" onClick={() => navigate('/upload')}>
-            <Upload size={16} /> Initialize Library
+            <Upload size={16} /> Upload Contract
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map(c => (
             <div
               key={c.id}
               className="card glass fade-in"
-              style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '20px 24px', cursor: 'pointer', border: '1px solid var(--border)' }}
-              onClick={() => navigate(`/analysis/${c.id}`)}
+              style={{ overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              onClick={() => navigate(`/contracts/${c.id}`)}
             >
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', border: '1px solid var(--accent)', flexShrink: 0 }}>
-                <FileText size={24} />
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                   <h3 style={{ fontWeight: 700, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.filename}</h3>
-                   <span className={`badge badge-${c.risk_level || 'low'}`} style={{ fontSize: 10 }}>{c.risk_level || 'Pending'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '20px 24px' }}>
+                <div style={{ width: 52, height: 52, borderRadius: 12, background: c.is_valid_contract ? 'var(--accent-glow)' : 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: c.is_valid_contract ? 'var(--accent)' : '#f59e0b', border: `1px solid ${c.is_valid_contract ? 'var(--accent)' : 'rgba(245,158,11,0.3)'}`, flexShrink: 0 }}>
+                  {c.is_valid_contract ? <FileText size={24} /> : <AlertTriangle size={24} />}
                 </div>
-                <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                      <Layers size={14} /> <span>{c.page_count} Pages</span>
-                   </div>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                      <Activity size={14} /> <span>{c.word_count?.toLocaleString()} words</span>
-                   </div>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                      <Calendar size={14} /> <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                   </div>
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-                {c.risk_score !== null && (
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: c.risk_level === 'critical' ? '#ef4444' : c.risk_level === 'high' ? '#f87171' : c.risk_level === 'medium' ? '#fbbf24' : '#34d399' }}>
-                      {Math.round(c.risk_score)}%
-                    </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Risk</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                     <h3 style={{ fontWeight: 700, fontSize: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.filename}</h3>
+                     {c.is_valid_contract ? (
+                       <span className={`badge badge-${c.risk_level || 'low'}`} style={{ fontSize: 10 }}>{c.risk_level || 'Pending'}</span>
+                     ) : (
+                       <span className="badge badge-warning" style={{ fontSize: 10 }}>Not a Contract</span>
+                     )}
                   </div>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                   <button className="btn btn-secondary btn-sm" style={{ padding: 10 }} onClick={e => { e.stopPropagation(); navigate(`/analysis/${c.id}`); }}><Eye size={16} /></button>
-                   <button className="btn btn-danger btn-sm" style={{ padding: 10 }} disabled={deleting === c.id} onClick={e => { e.stopPropagation(); handleDelete(c.id, c.filename); }}>{deleting === c.id ? <div className="spinner" /> : <Trash2 size={16} />}</button>
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <Layers size={14} /> <span>{c.page_count} Pages</span>
+                     </div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <Activity size={14} /> <span>{c.word_count?.toLocaleString()} words</span>
+                     </div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <Calendar size={14} /> <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                     </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                  {c.risk_score !== null && c.is_valid_contract && (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: c.risk_level === 'critical' ? '#ef4444' : c.risk_level === 'high' ? '#f87171' : c.risk_level === 'medium' ? '#fbbf24' : '#34d399' }}>
+                        {Math.round(c.risk_score)}
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Risk</div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                     <button
+                       className="btn btn-secondary btn-sm"
+                       style={{ padding: 10, color: 'var(--accent)' }}
+                       onClick={e => { e.stopPropagation(); navigate(`/contracts/${c.id}`); }}
+                       title="View Analysis"
+                     >
+                       <ChevronRight size={16} />
+                     </button>
+                     <button className="btn btn-danger btn-sm" style={{ padding: 10 }} disabled={deleting === c.id} onClick={e => { e.stopPropagation(); handleDelete(c.id, c.filename); }}>
+                       {deleting === c.id ? <div className="spinner" /> : <Trash2 size={16} />}
+                     </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Summary preview on hover — no expand, just a subtle hint */}
+              {c.ai_summary && c.is_valid_contract && (
+                <div style={{ padding: '0 24px 16px 92px' }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', lineHeight: 1.4 }}>
+                    {c.ai_summary}
+                  </p>
+                </div>
+              )}
             </div>
           ))}
         </div>
