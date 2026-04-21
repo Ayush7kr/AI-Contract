@@ -19,6 +19,11 @@ class ContractResponse(BaseModel):
     status: str
     created_at: datetime
     analysis_json: Optional[Any]
+    
+    # New Fields
+    contract_type: Optional[str] = None
+    confidence_score: Optional[float] = None
+    risk_breakdown_json: Optional[Dict[str, float]] = None
 
     class Config:
         from_attributes = True
@@ -28,6 +33,22 @@ class ContractDetailResponse(ContractResponse):
     raw_text: Optional[str]
     clauses_json: Optional[Any]
     compliance_json: Optional[Any]
+
+
+class CompareRequest(BaseModel):
+    contract_id_1: int
+    contract_id_2: int
+
+
+class CompareResponse(BaseModel):
+    difference_analysis: Dict[str, Any]
+    contract1_name: str
+    contract2_name: str
+
+
+class SimulateRequest(BaseModel):
+    contract_id: int
+    modified_text: str
 
 
 class SuggestRequest(BaseModel):

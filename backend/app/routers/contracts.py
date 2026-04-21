@@ -92,9 +92,13 @@ async def upload_contract(
         # Run Gemini AI analysis
         analysis = analyze_contract(raw_text)
 
-        contract.risk_score = analysis["risk_score"]
-        contract.risk_level = analysis["risk_level"]
-        contract.ai_summary = analysis["summary"]
+        contract.risk_score = analysis.get("risk_score", 0)
+        contract.risk_level = analysis.get("risk_level", "low")
+        contract.ai_summary = analysis.get("summary", "Analysis completed.")
+        contract.contract_type = analysis.get("contract_type", "General Agreement")
+        contract.confidence_score = analysis.get("confidence_score", 0)
+        contract.risk_breakdown_json = analysis.get("risk_breakdown", {})
+        
         contract.clauses_json = analysis.get("key_clauses", [])
         contract.analysis_json = analysis
         contract.status = "done"

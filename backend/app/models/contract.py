@@ -27,6 +27,11 @@ class Contract(Base):
     risk_score = Column(Float, nullable=True)           # 0–100
     risk_level = Column(String, nullable=True)          # low / medium / high / critical
     ai_summary = Column(Text, nullable=True)            # Gemini-generated summary
+    
+    # New Fields
+    contract_type = Column(String, nullable=True)       # NDA, Service Agreement, etc.
+    confidence_score = Column(Float, nullable=True)     # AI confidence in analysis
+    risk_breakdown_json = Column(JSON, nullable=True)   # Breakdown by category
 
     # AI Analysis JSON (stored as JSON string)
     clauses_json = Column(JSON, nullable=True)          # List of clause dicts from Gemini

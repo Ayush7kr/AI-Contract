@@ -22,6 +22,7 @@ import LegalChat from './pages/LegalChat';
 import Negotiate from './pages/Negotiate';
 import Compliance from './pages/Compliance';
 import VendorIntel from './pages/VendorIntel';
+import CompareContracts from './pages/CompareContracts';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -59,6 +60,7 @@ function AppRoutes() {
         <Route path="negotiate" element={<Negotiate />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="vendor" element={<VendorIntel />} />
+        <Route path="compare" element={<CompareContracts />} />
       </Route>
 
       {/* Fallback */}

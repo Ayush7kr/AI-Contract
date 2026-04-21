@@ -9,11 +9,65 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.contract import Contract
-from app.schemas.contract import SuggestRequest, NegotiateRequest, ChatRequest
-from app.services.gemini_service import rewrite_clause, chat_with_document, generate_legal_news, generate_contract_news
+from app.schemas.contract import SuggestRequest, NegotiateRequest, ChatRequest, CompareRequest, CompareResponse, SimulateRequest
+from app.services.gemini_service import rewrite_clause, chat_with_document, generate_legal_news, generate_contract_news, compare_contracts, generate_clause_suggestion, analyze_contract
 from app.services.rag_service import retrieve_relevant
 
 router = APIRouter()
+
+
+@router.post("/compare", response_model=CompareResponse)
+def compare(
+    request: CompareRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Compare two contracts and return differences and AI explanation."""
+    c1 = db.query(Contract).filter(Contract.id == request.contract_id_1, Contract.user_id == current_user.id).first()
+    c2 = db.query(Contract).filter(Contract.id == request.contract_id_2, Contract.user_id == current_user.id).first()
+    
+    if not c1 or not c2:
+        raise HTTPException(status_code=404, detail="One or both contracts not found")
+    
+    comparison = compare_contracts(c1.raw_text or "", c2.raw_text or "")
+    
+    return {
+        "difference_analysis": comparison,
+        "contract1_name": c1.filename,
+        "contract2_name": c2.filename
+    }
+
+
+@router.get("/template/{clause_type}")
+def get_clause_template(
+    clause_type: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Generate a standard legal clause template."""
+    return generate_clause_suggestion(clause_type)
+
+
+@router.post("/simulate")
+def simulate_risk(
+    request: SimulateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Re-analyze a modified version of a contract to see risk score impact."""
+    contract = db.query(Contract).filter(Contract.id == request.contract_id, Contract.user_id == current_user.id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    
+    # Run analysis on the modified text
+    analysis = analyze_contract(request.modified_text)
+    
+    return {
+        "original_score": contract.risk_score,
+        "new_score": analysis.get("risk_score", 0),
+        "new_level": analysis.get("risk_level", "low"),
+        "explanation": analysis.get("risk_explanation", ""),
+        "changes": analysis.get("key_risks", [])
+    }
 
 
 @router.post("/suggest")

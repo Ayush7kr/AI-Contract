@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Upload, FileText, Shield,
-  Building2, MessageSquare, Gavel, X, LogOut
+  Building2, MessageSquare, Gavel, X, LogOut, GitCompare
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'OVERVIEW' },
   { path: '/upload', label: 'Upload Document', icon: Upload, group: 'CONTRACTS' },
   { path: '/contracts', label: 'My Contracts', icon: FileText, group: 'CONTRACTS' },
+  { path: '/compare', label: 'Compare Contracts', icon: GitCompare, group: 'CONTRACTS' },
   { path: '/chat', label: 'AI Assistant', icon: MessageSquare, group: 'AI TOOLS' },
   { path: '/negotiate', label: 'Clause Negotiation', icon: Gavel, group: 'AI TOOLS' },
   { path: '/compliance', label: 'Compliance Scan', icon: Shield, group: 'AI TOOLS' },

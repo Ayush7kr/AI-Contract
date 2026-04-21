@@ -9,17 +9,21 @@ import {
   ArrowLeft, FileText, Calendar, Clock, Shield, Gavel,
   MessageSquare, AlertTriangle, CheckCircle2, XCircle,
   ChevronRight, Copy, Layers, Activity, AlertOctagon,
-  ShieldAlert, ShieldCheck, Eye, EyeOff, Globe, Sparkles
+  ShieldAlert, ShieldCheck, Eye, EyeOff, Globe, Sparkles,
+  TrendingUp, TrendingDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, 
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend
+} from 'recharts';
 
 const RISK_COLORS = {
   low: '#10b981', medium: '#f59e0b', high: '#ef4444', critical: '#dc2626'
 };
 
-const IMPORTANCE_COLORS = {
-  critical: '#ef4444', recommended: '#f59e0b', optional: '#3b82f6'
-};
+const BREAKDOWN_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e'];
 
 export default function ContractAnalysis() {
   const { id } = useParams();
@@ -30,24 +34,45 @@ export default function ContractAnalysis() {
   const [showRawText, setShowRawText] = useState(false);
   const [contractInsights, setContractInsights] = useState([]);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  
+  // Simulator state
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [simText, setSimText] = useState('');
+  const [simResult, setSimResult] = useState(null);
+  const [simulating, setSimulating] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     contractsAPI.get(id)
-      .then(r => setContract(r.data))
+      .then(r => {
+        setContract(r.data);
+        setSimText(r.data.raw_text || '');
+      })
       .catch(() => {
         toast.error('Failed to load contract');
         navigate('/contracts');
       })
       .finally(() => setLoading(false));
 
-    // Fetch contract insights
     setLoadingInsights(true);
     aiAPI.contractNews(id)
       .then(r => setContractInsights(r.data.contract_insights || []))
       .catch(() => {})
       .finally(() => setLoadingInsights(false));
   }, [id, navigate]);
+
+  const handleSimulate = async () => {
+    setSimulating(true);
+    try {
+      const res = await aiAPI.simulate({ contract_id: id, modified_text: simText });
+      setSimResult(res.data);
+      toast.success('Simulation complete');
+    } catch {
+      toast.error('Simulation failed');
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   if (loading) return (
     <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
@@ -65,6 +90,11 @@ export default function ContractAnalysis() {
   const riskExplanation = analysis.risk_explanation || '';
   const riskColor = RISK_COLORS[contract.risk_level] || '#f59e0b';
   const isNotContract = !contract.is_valid_contract;
+
+  const breakdownData = contract.risk_breakdown_json ? Object.entries(contract.risk_breakdown_json).map(([name, value]) => ({
+    name: name.replace('_risk', '').toUpperCase(),
+    value
+  })) : [];
 
   const copyText = (text) => {
     navigator.clipboard.writeText(text);
@@ -101,28 +131,91 @@ export default function ContractAnalysis() {
             {isNotContract ? <AlertTriangle size={28} /> : <FileText size={28} />}
           </div>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', marginBottom: 6 }}>{contract.filename}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>{contract.filename}</h1>
+              <span className="badge badge-info" style={{ fontSize: 10, textTransform: 'uppercase' }}>{contract.contract_type || 'General'}</span>
+            </div>
             <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <Calendar size={14} /> {new Date(contract.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                <Calendar size={14} /> {new Date(contract.created_at).toLocaleDateString()}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <Layers size={14} /> {contract.page_count} {contract.page_count === 1 ? 'page' : 'pages'}
+                <Layers size={14} /> {contract.page_count} Pages
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                <Activity size={14} /> {contract.word_count?.toLocaleString()} words
+                <Sparkles size={14} color="var(--warning)" /> {contract.confidence_score}% Confidence
               </div>
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {!isNotContract && (
+            <button 
+              className={`btn ${showSimulator ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setShowSimulator(!showSimulator)}
+              style={{ fontSize: 11 }}
+            >
+              <Activity size={14} /> {showSimulator ? 'Close Simulator' : 'What-If Simulator'}
+            </button>
+          )}
           <span className={`badge badge-${isNotContract ? 'warning' : contract.status === 'done' ? 'pass' : 'info'}`} style={{ fontSize: 11, padding: '5px 14px' }}>
             {isNotContract ? 'Not a Contract' : contract.status === 'done' ? '✓ Analyzed' : contract.status}
           </span>
         </div>
       </div>
 
-      {/* ───── Not a Contract Warning ───── */}
+      {/* ───── Simulator Panel ───── */}
+      {showSimulator && (
+        <div className="card glass fade-in" style={{ padding: 32, marginBottom: 24, border: '1px solid var(--accent)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Activity size={20} color="var(--accent)" /> Risk Simulator (What-If)
+            </h3>
+            <div className="badge badge-info">Transient Analysis</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24 }}>
+            <div>
+              <textarea
+                className="input"
+                style={{ height: 400, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6, padding: 20 }}
+                value={simText}
+                onChange={e => setSimText(e.target.value)}
+                placeholder="Modify any clause here to see how it affects the risk score..."
+              />
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', marginTop: 16 }} 
+                disabled={simulating}
+                onClick={handleSimulate}
+              >
+                {simulating ? <div className="spinner" /> : <><Sparkles size={16} /> Re-Run Analysis</>}
+              </button>
+            </div>
+            <div style={{ padding: 24, borderRadius: 16, background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+               {simResult ? (
+                 <div className="fade-in">
+                    <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                      <div style={{ fontSize: 48, fontWeight: 900, color: RISK_COLORS[simResult.new_level] }}>{simResult.new_score}</div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Simulated Risk Score</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '8px 12px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border)', fontSize: 12 }}>
+                       {simResult.new_score > simResult.original_score ? <TrendingUp size={18} color="var(--danger)" /> : <TrendingDown size={18} color="var(--success)" />}
+                       <span>Score changed from <strong>{simResult.original_score}</strong> to <strong>{simResult.new_score}</strong></span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{simResult.explanation}</p>
+                 </div>
+               ) : (
+                 <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', opacity: 0.5 }}>
+                   <Activity size={48} style={{ marginBottom: 16 }} />
+                   <p style={{ fontSize: 13 }}>Modify the text and click analyze to see how risk levels shift.</p>
+                 </div>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───── Case 1: Not a Legal Contract ───── */}
       {isNotContract && (
         <div className="card fade-in" style={{ padding: 32, marginBottom: 24, border: '1px solid rgba(245, 158, 11, 0.3)', background: 'rgba(245, 158, 11, 0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
@@ -148,12 +241,34 @@ export default function ContractAnalysis() {
         </div>
       )}
 
-      {/* ───── Valid Contract Analysis ───── */}
-      {!isNotContract && (
+      {/* ───── Case 2: Valid Contract Analysis ───── */}
+      {!isNotContract && !showSimulator && (
         <>
-          {/* ───── 2. Risk Overview + AI Summary Row ───── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24, marginBottom: 24 }}>
-            {/* Risk Card */}
+          {/* ───── 2. Risk Overview + Chart Row ───── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 320px', gap: 24, marginBottom: 24 }}>
+            {/* Risk Breakdown Chart */}
+            <div className="card glass" style={{ padding: 32 }}>
+               <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 20 }}>Risk Breakdown</h3>
+               <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={breakdownData} layout="vertical">
+                    <XAxis type="number" hide domain={[0, 100]} />
+                    <YAxis dataKey="name" type="category" width={100} style={{ fontSize: 10, fontWeight: 700 }} />
+                    <Tooltip 
+                      contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}
+                      labelStyle={{ color: 'var(--text-primary)', fontWeight: 800 }}
+                    />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {breakdownData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={BREAKDOWN_COLORS[index % BREAKDOWN_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+               </div>
+            </div>
+
+            {/* Overall Risk Card */}
             <div className="card glass" style={{ padding: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{
                 width: 130, height: 130, borderRadius: '50%',
@@ -183,9 +298,10 @@ export default function ContractAnalysis() {
                 </p>
               )}
             </div>
-
-            {/* AI Summary */}
-            <div className="card glass" style={{ padding: 32 }}>
+          </div>
+          
+          {/* ───── AI Summary ───── */}
+          <div className="card glass" style={{ padding: 32, marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
@@ -199,23 +315,6 @@ export default function ContractAnalysis() {
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
                 {contract.ai_summary || analysis.summary || 'No summary available.'}
               </p>
-
-              {/* Quick Stats */}
-              <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-                <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Clauses: </span>
-                  <span style={{ fontWeight: 700 }}>{clauses.length}</span>
-                </div>
-                <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Risks: </span>
-                  <span style={{ fontWeight: 700, color: keyRisks.length > 0 ? 'var(--warning)' : 'var(--success)' }}>{keyRisks.length}</span>
-                </div>
-                <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Missing: </span>
-                  <span style={{ fontWeight: 700, color: missingClauses.length > 0 ? 'var(--danger)' : 'var(--success)' }}>{missingClauses.length}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* ───── 4. Key Risk Factors ───── */}
@@ -226,26 +325,41 @@ export default function ContractAnalysis() {
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
-                {/* Missing Clauses */}
+                {/* Missing Clauses & Smart Suggestions */}
                 {missingClauses.length > 0 && (
                   <div style={{ padding: 20, borderRadius: 14, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}>
                     <h4 style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <XCircle size={16} /> Missing Clauses
+                      <XCircle size={16} /> Missing Clauses (Fix with AI)
                     </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {missingClauses.map((mc, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'start' }}>
-                          <div style={{
-                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
-                            background: IMPORTANCE_COLORS[mc.importance] || '#f59e0b'
-                          }} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
-                              {mc.clause_name}
-                              <span className={`badge badge-${mc.importance === 'critical' ? 'violation' : mc.importance === 'recommended' ? 'warning' : 'info'}`} style={{ fontSize: 9, marginLeft: 8 }}>{mc.importance}</span>
-                            </div>
-                            <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{mc.description}</p>
+                        <div key={i} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{mc.clause_name}</div>
+                            <span className={`badge badge-${mc.importance === 'critical' ? 'violation' : 'warning'}`} style={{ fontSize: 8 }}>{mc.importance}</span>
                           </div>
+                          <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>{mc.description}</p>
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{ width: '100%', fontSize: 10, height: 32 }}
+                            onClick={() => {
+                              toast.loading(`Generating template for ${mc.clause_name}...`);
+                              aiAPI.getTemplate(mc.clause_name).then(res => {
+                                toast.dismiss();
+                                setSelectedClause({ 
+                                  title: res.data.clause_title, 
+                                  text: res.data.suggested_text, 
+                                  is_template: true,
+                                  reasons: res.data.key_points
+                                });
+                              }).catch(() => {
+                                toast.dismiss();
+                                toast.error('Failed to generate template');
+                              });
+                            }}
+                          >
+                            <Sparkles size={12} /> Generate Recommended Clause
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -260,17 +374,14 @@ export default function ContractAnalysis() {
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {weakClauses.map((wc, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'start' }}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6, background: '#f59e0b' }} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{wc.clause_name}</div>
-                            <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                              <strong>Issue:</strong> {wc.issue}
-                            </p>
-                            <p style={{ fontSize: 11, color: 'var(--accent-light)', lineHeight: 1.4, marginTop: 2 }}>
-                              💡 {wc.suggestion}
-                            </p>
-                          </div>
+                        <div key={i} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{wc.clause_name}</div>
+                          <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                            <strong>Issue:</strong> {wc.issue}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--accent-light)', lineHeight: 1.4, marginTop: 4 }}>
+                            💡 {wc.suggestion}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -285,18 +396,12 @@ export default function ContractAnalysis() {
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {keyRisks.map((risk, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'start' }}>
-                          <div style={{
-                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
-                            background: RISK_COLORS[risk.severity] || '#f59e0b'
-                          }} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
-                              {risk.title}
-                              <span className={`badge badge-${risk.severity || 'medium'}`} style={{ fontSize: 9, marginLeft: 8 }}>{risk.severity}</span>
-                            </div>
-                            <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{risk.description}</p>
+                        <div key={i} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                            {risk.title}
+                            <span className={`badge badge-${risk.severity || 'medium'}`} style={{ fontSize: 9, marginLeft: 8 }}>{risk.severity}</span>
                           </div>
+                          <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{risk.description}</p>
                         </div>
                       ))}
                     </div>
@@ -306,126 +411,90 @@ export default function ContractAnalysis() {
             </div>
           )}
 
-          {/* ───── 4.5 Regulatory Intelligence (Specific to Contract) ───── */}
-          <div className="card glass" style={{ padding: 32, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Globe size={20} color="var(--info)" /> Regulatory Intelligence
-              </h3>
-              <span className="badge badge-info" style={{ fontSize: 9 }}>Contract-Specific Analysis</span>
-            </div>
-
-            {loadingInsights ? (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div className="spinner" style={{ width: 28, height: 28, margin: '0 auto 12px' }} />
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Analyzing regulatory impact for this agreement...</p>
+          {/* ───── Clause Template Modal (from suggestions) ───── */}
+          {selectedClause && selectedClause.is_template && (
+            <div className="card glass fade-in" style={{ padding: 32, marginBottom: 24, border: '1px solid var(--accent)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800 }}>AI Generated Clause: {selectedClause.title}</h3>
+                <button className="btn btn-secondary btn-sm" onClick={() => setSelectedClause(null)}>Close</button>
               </div>
-            ) : contractInsights.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
-                {contractInsights.map((insight, i) => (
-                  <div key={i} className="fade-in" style={{ padding: 20, borderRadius: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: 0, right: 0, padding: '4px 10px', background: insight.risk_level === 'High' ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)', fontSize: 9, fontWeight: 800, color: insight.risk_level === 'High' ? 'var(--danger)' : 'var(--info)', borderRadius: '0 0 0 12px', textTransform: 'uppercase' }}>
-                      {insight.risk_level} Impact
-                    </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-light)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{insight.category}</div>
-                    <h4 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10, lineHeight: 1.4 }}>{insight.title}</h4>
-                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>{insight.impact_on_contract}</p>
-                    <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-primary)', display: 'flex', gap: 8, alignItems: 'start' }}>
-                      <Sparkles size={14} color="var(--warning)" style={{ flexShrink: 0, marginTop: 2 }} />
-                      <span><strong>Recommendation:</strong> {insight.suggestion}</span>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ padding: 20, borderRadius: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.6, marginBottom: 20, whiteSpace: 'pre-wrap' }}>
+                {selectedClause.text}
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', borderRadius: 16, border: '1px dashed var(--border)' }}>
-                 <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>No specific regulatory impacts found for this contract type.</p>
-              </div>
-            )}
-          </div>
-
-          {/* ───── 5. Extracted Clauses ───── */}
-          {clauses.length > 0 && (
-            <div className="card glass" style={{ padding: 32, marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <ShieldCheck size={20} color="var(--accent)" /> Extracted Clauses
-                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)' }}>({clauses.length})</span>
-                </h3>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
-                {clauses.map((clause, i) => {
-                  const isSelected = selectedClause === i;
-                  return (
-                    <div
-                      key={i}
-                      onClick={() => setSelectedClause(isSelected ? null : i)}
-                      style={{
-                        padding: '16px 20px', borderRadius: 14, cursor: 'pointer',
-                        background: isSelected ? 'var(--accent-glow)' : 'var(--bg-input)',
-                        border: `1px solid ${isSelected ? 'var(--accent)' : clause.is_risky ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'capitalize' }}>
-                          {clause.title || clause.type?.replace(/_/g, ' ') || `Clause ${i + 1}`}
-                        </span>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          {clause.is_risky && <span className="badge badge-warning" style={{ fontSize: 9 }}>Risky</span>}
-                          <ChevronRight size={14} style={{
-                            transform: isSelected ? 'rotate(90deg)' : 'none',
-                            transition: 'transform 0.2s', color: 'var(--text-muted)'
-                          }} />
-                        </div>
-                      </div>
-
-                      {/* Collapsed: Show truncated text */}
-                      {!isSelected && (
-                        <p style={{ fontSize: 11, color: 'var(--text-secondary)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.5 }}>
-                          {clause.text}
-                        </p>
-                      )}
-
-                      {/* Expanded: full detail */}
-                      {isSelected && (
-                        <div className="fade-in">
-                          <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 10 }}>
-                            {clause.text}
-                          </p>
-                          {clause.risk_reason && (
-                            <div style={{ padding: 10, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: 10 }}>
-                              ⚠️ <strong>Risk:</strong> {clause.risk_reason}
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              className="btn btn-secondary btn-sm"
-                              onClick={(e) => { e.stopPropagation(); copyText(clause.text); }}
-                              style={{ fontSize: 11 }}
-                            >
-                              <Copy size={12} /> Copy
-                            </button>
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate('/negotiate', { state: { contractId: contract.id, clauseText: clause.text, clauseType: clause.title || clause.type } });
-                              }}
-                              style={{ fontSize: 11 }}
-                            >
-                              <Gavel size={12} /> Negotiate
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button className="btn btn-primary" onClick={() => copyText(selectedClause.text)} style={{ flex: 1 }}><Copy size={16} /> Copy to Clipboard</button>
+                <div style={{ flex: 1, padding: '0 12px', borderLeft: '1px solid var(--border)' }}>
+                   <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 8 }}>KEY PROTECTIONS:</div>
+                   {selectedClause.reasons?.map((r, i) => <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>• {r}</div>)}
+                </div>
               </div>
             </div>
           )}
+
+          {/* ───── 5. Extracted Clauses & Interactive Highlighter ───── */}
+          <div className="card glass" style={{ padding: 32, marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ShieldCheck size={20} color="var(--accent)" /> Detailed Clause Analysis
+              </h3>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(239,68,68,0.2)' }} /> Risky</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(16,185,129,0.2)' }} /> Safe</div>
+              </div>
+            </div>
+
+            <div style={{ 
+              maxHeight: 600, overflowY: 'auto', padding: 24, borderRadius: 16, 
+              background: 'var(--bg-input)', border: '1px solid var(--border)',
+              fontSize: 14, lineHeight: 1.8, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap'
+            }}>
+               {(() => {
+                 let text = contract.raw_text || '';
+                 if (!text) return 'No text extracted.';
+                 
+                 const sortedClauses = [...clauses].filter(c => c.exact_text).sort((a,b) => b.exact_text.length - a.exact_text.length);
+                 
+                 let elements = [];
+                 let lastIndex = 0;
+                 
+                 sortedClauses.forEach((c, i) => {
+                    const idx = text.indexOf(c.exact_text, lastIndex);
+                    if (idx !== -1) {
+                      if (idx > lastIndex) {
+                        elements.push(text.substring(lastIndex, idx));
+                      }
+                      
+                      const highlightColor = c.classification === 'risky' ? 'rgba(239,68,68,0.15)' : c.classification === 'safe' ? 'rgba(16,185,129,0.15)' : 'transparent';
+                      const borderColor = c.classification === 'risky' ? 'rgba(239,68,68,0.3)' : c.classification === 'safe' ? 'rgba(16,185,129,0.3)' : 'transparent';
+                      
+                      elements.push(
+                        <span 
+                          key={i} 
+                          title={c.risk_reason || c.title}
+                          style={{ 
+                            background: highlightColor, 
+                            borderBottom: `2px solid ${borderColor}`,
+                            cursor: 'help',
+                            transition: 'all 0.2s',
+                            padding: '1px 0'
+                          }}
+                          onClick={() => toast(c.risk_reason || 'Neutral Clause', { icon: c.classification === 'risky' ? '⚠️' : '✅' })}
+                        >
+                          {c.exact_text}
+                        </span>
+                      );
+                      lastIndex = idx + c.exact_text.length;
+                    }
+                 });
+                 
+                 if (lastIndex < text.length) {
+                   elements.push(text.substring(lastIndex));
+                 }
+                 
+                 return elements.length > 0 ? elements : text;
+               })()}
+            </div>
+          </div>
 
           {/* ───── 6. Action Buttons ───── */}
           <div className="card glass" style={{ padding: '20px 32px', marginBottom: 24 }}>
@@ -453,34 +522,34 @@ export default function ContractAnalysis() {
               </button>
             </div>
           </div>
-
-          {/* ───── Raw Text Toggle ───── */}
-          <div className="card glass" style={{ padding: '20px 32px' }}>
-            <button
-              onClick={() => setShowRawText(!showRawText)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
-                gap: 8, fontSize: 13, fontWeight: 600, transition: 'color 0.2s',
-              }}
-            >
-              {showRawText ? <EyeOff size={16} /> : <Eye size={16} />}
-              {showRawText ? 'Hide' : 'Show'} Extracted Text
-            </button>
-            {showRawText && (
-              <div className="fade-in" style={{
-                marginTop: 16, padding: 16, borderRadius: 10,
-                background: 'var(--bg-input)', border: '1px solid var(--border)',
-                maxHeight: 400, overflowY: 'auto', fontSize: 12,
-                color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                fontFamily: "'JetBrains Mono', monospace",
-              }}>
-                {contract.raw_text || 'No text available'}
-              </div>
-            )}
-          </div>
         </>
       )}
+
+      {/* ───── 7. Raw Text Toggle (Always available at bottom) ───── */}
+      <div className="card glass" style={{ padding: '20px 32px' }}>
+        <button
+          onClick={() => setShowRawText(!showRawText)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+            gap: 8, fontSize: 13, fontWeight: 600, transition: 'color 0.2s',
+          }}
+        >
+          {showRawText ? <EyeOff size={16} /> : <Eye size={16} />}
+          {showRawText ? 'Hide' : 'Show'} Extracted Text
+        </button>
+        {showRawText && (
+          <div className="fade-in" style={{
+            marginTop: 16, padding: 16, borderRadius: 10,
+            background: 'var(--bg-input)', border: '1px solid var(--border)',
+            maxHeight: 400, overflowY: 'auto', fontSize: 12,
+            color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap',
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
+            {contract.raw_text || 'No text available'}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

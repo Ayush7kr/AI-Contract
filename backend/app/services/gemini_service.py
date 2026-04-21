@@ -72,52 +72,61 @@ def analyze_contract(text: str) -> Dict[str, Any]:
     # Truncate to fit Gemini context
     truncated = text[:12000]
 
-    prompt = f"""You are a legal contract analysis AI. Analyze this contract text thoroughly and return a JSON object with EXACTLY these fields:
+    prompt = f"""You are a professional legal contract analysis AI. Analyze this contract text and return a JSON object with EXACTLY these fields:
 
 {{
-  "is_legal_contract": <true or false — whether this text is actually a legal contract>,
-  "risk_score": <integer 0-100, where 0=no risk and 100=extreme risk. Base this on: presence/absence of protective clauses, ambiguous language, one-sided terms, missing standard clauses>,
-  "risk_level": "<one of: low, medium, high, critical>",
-  "risk_explanation": "<2-3 sentence explanation of WHY this risk score was assigned. Reference specific clauses or missing elements>",
-  "summary": "<3-5 sentence summary of the contract's purpose, parties involved, and key terms>",
+  "is_legal_contract": <true or false>,
+  "contract_type": "<detected type, e.g. Service Agreement, NDA, Employment Contract, Vendor Agreement, etc.>",
+  "risk_score": <integer 0-100>,
+  "risk_level": "<low, medium, high, critical>",
+  "risk_explanation": "<2-3 sentence explanation of the risk score>",
+  "confidence_score": <integer 0-100 indicating your confidence in this analysis>,
+  "risk_breakdown": {{
+    "liability_risk": <0-100>,
+    "payment_risk": <0-100>,
+    "compliance_risk": <0-100>,
+    "termination_risk": <0-100>
+  }},
+  "summary": "<3-5 sentence summary>",
   "key_risks": [
     {{
       "title": "<risk title>",
       "severity": "<low, medium, high, or critical>",
-      "description": "<1-2 sentence description of the risk>"
+      "description": "<description>"
     }}
   ],
   "missing_clauses": [
     {{
-      "clause_name": "<name of the missing clause, e.g. Force Majeure, Data Protection, Dispute Resolution>",
+      "clause_name": "<name>",
       "importance": "<critical, recommended, or optional>",
-      "description": "<why this clause should be present>"
+      "description": "<why missing>"
     }}
   ],
   "weak_clauses": [
     {{
-      "clause_name": "<name of the weak clause>",
-      "issue": "<what makes this clause weak or ambiguous>",
-      "suggestion": "<how it could be strengthened>"
+      "clause_name": "<name>",
+      "issue": "<what's weak>",
+      "suggestion": "<how to fix>"
     }}
   ],
   "key_clauses": [
     {{
-      "type": "<clause type like: scope_of_services, payment_terms, confidentiality, liability, termination, indemnification, intellectual_property, governing_law, dispute_resolution, warranties, data_protection, non_compete, force_majeure, amendment, notices, assignment>",
-      "title": "<human-readable clause title, e.g. Scope of Services, Payment Terms>",
-      "text": "<relevant excerpt from the contract for this clause, max 300 chars>",
+      "type": "<clause type>",
+      "title": "<human-readable title>",
+      "text": "<short excerpt, max 300 chars>",
       "is_risky": <true or false>,
-      "risk_reason": "<why this clause is risky, or empty string if not risky>"
+      "risk_reason": "<reason>",
+      "classification": "<risky, safe, or neutral>",
+      "exact_text": "<the EXACT full text of this clause from the document for highlighting purposes>"
     }}
   ]
 }}
 
 IMPORTANT RULES:
-- Extract as many distinct clauses as you can find in the document (aim for 5-15 clauses)
-- For missing_clauses, identify standard contract clauses that SHOULD be present but are NOT
-- For weak_clauses, identify clauses that exist but have vague, ambiguous, or one-sided language
-- Base risk_score entirely on the document content — never use random numbers
-- Return ONLY valid JSON, no markdown, no explanation
+- "exact_text" MUST match the source document EXACTLY for highlighting.
+- "risk_breakdown" should sum up the specific risk categories.
+- "contract_type" must be a standard legal category.
+- Return ONLY valid JSON.
 
 CONTRACT TEXT:
 {truncated}"""
@@ -126,16 +135,24 @@ CONTRACT TEXT:
     if result:
         # Ensure required fields exist with defaults
         result.setdefault("is_legal_contract", True)
+        result.setdefault("contract_type", "General Agreement")
         result.setdefault("risk_score", 0)
         result.setdefault("risk_level", "low")
-        result.setdefault("risk_explanation", "")
+        result.setdefault("confidence_score", 85)
+        result.setdefault("risk_breakdown", {
+            "liability_risk": 0,
+            "payment_risk": 0,
+            "compliance_risk": 0,
+            "termination_risk": 0
+        })
         result.setdefault("summary", "Analysis completed.")
         result.setdefault("key_risks", [])
         result.setdefault("missing_clauses", [])
         result.setdefault("weak_clauses", [])
         result.setdefault("key_clauses", [])
-        # Clamp risk score
+        # Clamp scores
         result["risk_score"] = max(0, min(100, int(result["risk_score"])))
+        result["confidence_score"] = max(0, min(100, int(result["confidence_score"])))
         return result
 
     # Fallback if Gemini fails
@@ -410,4 +427,65 @@ CONTRACT TEXT:
         return result
 
     return {"contract_insights": []}
+
+
+# ─── New Features: Comparison & Suggestions ──────────────────────────────────
+
+def compare_contracts(text1: str, text2: str) -> Dict[str, Any]:
+    """Compare two contracts and return differences and AI risk explanation."""
+    prompt = f"""You are a legal contract comparison AI. Compare these two versions of a contract and identify EXACTLY what changed.
+
+Return a JSON object with EXACTLY these fields:
+{{
+  "added_clauses": [{{ "title": "<title>", "text": "<text>" }}],
+  "removed_clauses": [{{ "title": "<title>", "text": "<text>" }}],
+  "modified_clauses": [{{ 
+    "title": "<title>", 
+    "before": "<old text>", 
+    "after": "<new text>",
+    "change_impact": "<how this change affects risk and legal standing>"
+  }}],
+  "overall_summary": "<brief summary of major differences>",
+  "risk_impact": "<explanation of whether changes increase or decrease overall risk>"
+}}
+
+CONTRACT 1:
+{text1[:8000]}
+
+CONTRACT 2:
+{text2[:8000]}
+
+Return ONLY valid JSON."""
+
+    result = _call_gemini_json(prompt)
+    return result or {
+        "added_clauses": [],
+        "removed_clauses": [],
+        "modified_clauses": [],
+        "overall_summary": "Comparison failed.",
+        "risk_impact": "Unknown"
+    }
+
+
+def generate_clause_suggestion(clause_type: str) -> Dict[str, Any]:
+    """Generate a standard legal clause template based on type."""
+    prompt = f"""Generate a standard, protective, and modern legal clause for: {clause_type}.
+
+Return a JSON object with EXACTLY these fields:
+{{
+  "clause_title": "<title>",
+  "suggested_text": "<the full legal text of the clause>",
+  "why_recommend": "<brief explanation of why this clause is important>",
+  "key_points": ["<point 1>", "<point 2>"]
+}}
+
+Return ONLY valid JSON."""
+
+    result = _call_gemini_json(prompt)
+    return result or {
+        "clause_title": clause_type,
+        "suggested_text": "Unable to generate template.",
+        "why_recommend": "AI service unavailable.",
+        "key_points": []
+    }
 

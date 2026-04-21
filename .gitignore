@@ -41,3 +41,11 @@ Thumbs.db
 
 # Uploads
 backend/app/uploads/
+
+# Databases
+*.db
+*.sqlite3
+
+# Custom Venvs
+venv_new/
+.venv_broken/

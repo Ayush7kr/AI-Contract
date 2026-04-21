@@ -64,6 +64,9 @@ export const aiAPI = {
   chat: (data) => apiClient.post('/ai/chat', data),
   legalNews: () => apiClient.get('/ai/legal-news'),
   contractNews: (contractId) => apiClient.get(`/ai/legal-news/${contractId}`),
+  compare: (data) => apiClient.post('/ai/compare', data),
+  getTemplate: (type) => apiClient.get(`/ai/template/${type}`),
+  simulate: (data) => apiClient.post('/ai/simulate', data),
 };
 
 // ─── Feature APIs ────────────────────────────────────────────────────────────
